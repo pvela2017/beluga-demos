@@ -2,7 +2,7 @@ services:
   beluga-demo-dev:
     build:
       context: ..
-      dockerfile: docker/images/${ROSDISTRO:-humble}/Dockerfile
+      dockerfile: docker/images/${ROSDISTRO:-jazzy}/Dockerfile
     container_name: beluga-demo-dev
     environment:
       - DISPLAY
