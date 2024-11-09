@@ -32,30 +32,12 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution(
                         [
-                            FindPackageShare("beluga_demo_bringup"),
-                            "launch",
-                            "simulation.launch.py",
-                        ]
-                    ),
-                ),
-                launch_arguments={
-                    "world_name": "hq4_office_populated.world",
-                }.items(),
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution(
-                        [
-                            FindPackageShare("beluga_demo_lidar_localization"),
+                            FindPackageShare("beluga_demo_amcl3_localization"),
                             "launch",
                             "bringup.launch.py",
                         ]
                     ),
                 ),
-                launch_arguments={
-                    "map_name": "hq4_office",
-                    "amcl_params_file": "likelihood_field_params.yaml",
-                }.items(),
             ),
         ]
     )

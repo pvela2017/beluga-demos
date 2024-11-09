@@ -28,13 +28,13 @@ list(APPEND CMAKE_MODULE_PATH "/usr/lib/x86_64-linux-gnu/cmake/OpenVDB/")
 ################################################################################
 
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(OpenVDB REQUIRED)
 find_package(range-v3 REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(beluga REQUIRED)
 find_package(beluga_ros REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -82,9 +82,16 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-install(TARGETS beluga_amcl3_demo_component DESTINATION lib/${PROJECT_NAME})
+install(TARGETS beluga_amcl3_demo_node DESTINATION lib/${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  scripts/tf_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY maps DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 ament_package()
