@@ -26,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -90,10 +90,6 @@ Visualization Manager:
         All Enabled: true
         base_link:
           Value: true
-        map:
-          Value: true
-        odom:
-          Value: true
         velodyne:
           Value: true
       Marker Scale: 5
@@ -102,18 +98,14 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        map:
-          odom:
-            base_link:
-              velodyne:
-                {}
+        {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: Map
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -124,15 +116,27 @@ Visualization Manager:
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: Ground Truth Path
+      Name: GT Path
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /gt_pose_markers
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: AMCL3 path
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /amcl3_pose_markers
       Value: true
   Enabled: true
   Global Options:

@@ -243,7 +243,7 @@ class Amcl3Node : public rclcpp::Node {
             pointcloud_filter_->registerCallback(std::bind(&Amcl3Node::pointcloud_callback, this, std::placeholders::_1));
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Subscribed to pointcloud_topic: %s", pointcloud_sub_->getTopic().c_str());
 
-        pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_amcl3", rclcpp::SystemDefaultsQoS());
+        pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("amcl3_poses", rclcpp::SystemDefaultsQoS());
 
         if (kDisplayMap) {
             m_visualization_marker_pub_ = create_publisher<visualization_msgs::msg::Marker>("vdb_map_visualization", rclcpp::SystemDefaultsQoS());
