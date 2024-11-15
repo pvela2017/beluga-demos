@@ -42,6 +42,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 
 ################################################################################
@@ -56,6 +58,8 @@ target_link_libraries(beluga_amcl3_demo_component
 ament_target_dependencies(
   beluga_amcl3_demo_component
   PUBLIC geometry_msgs
+         visualization_msgs
+         std_msgs
          sensor_msgs
          message_filters
          rclcpp
@@ -87,11 +91,12 @@ install(TARGETS beluga_amcl3_demo_node DESTINATION lib/${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
   scripts/tf_publisher.py
+  scripts/marker_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY maps DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY rviz DESTINATION share/${PROJECT_NAME})
 
 ament_package()

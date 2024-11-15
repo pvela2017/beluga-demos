@@ -9,7 +9,7 @@ from geometry_msgs.msg import TransformStamped
 class PoseRepublisher(Node):
 
     def __init__(self):
-        super().__init__('pose_republisher')
+        super().__init__('tf_republisher_node')
 
         # Subscribe to the input PoseStamped topic
         self.subscription = self.create_subscription(
@@ -25,7 +25,6 @@ class PoseRepublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
     def pose_callback(self, msg):
-        # Modify the frame_id
         new_frame_id = 'odom'
 
         # Create a new PoseStamped message
@@ -39,7 +38,7 @@ class PoseRepublisher(Node):
 
         # Create and publish the TransformStamped based on the PoseStamped
         transform = TransformStamped()
-        transform.header.stamp = new_msg.header.stamp
+        transform.header.stamp = msg.header.stamp
         transform.header.frame_id = new_msg.header.frame_id
         transform.child_frame_id = 'base_link'
         transform.transform.translation.x = new_msg.pose.position.x + 0.02725

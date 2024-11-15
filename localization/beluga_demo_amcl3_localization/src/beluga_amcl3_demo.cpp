@@ -36,6 +36,7 @@
 #include <sophus/se3.hpp>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/Grid.h>
 #include <openvdb/io/File.h>
 
 #include <beluga/beluga.hpp>
@@ -54,9 +55,12 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
 
 
 namespace beluga_demo_amcl3_localization {
@@ -83,8 +87,7 @@ class Amcl3 {
             resample_policy_ = resample_policy_ && beluga::policies::on_effective_size_drop;
         }        
         // Initialize particles using a custom distribution.
-        auto distribution = beluga::MultivariateNormalDistribution(pose, covariance);
-        particles_ = beluga::views::sample(std::move(distribution)) |                    
+        particles_ = beluga::views::sample(std::move(beluga::MultivariateNormalDistribution{pose, covariance})) |                    
                      ranges::views::transform(beluga::make_from_state<particle_type>) |  
                      ranges::views::take_exactly(kMaxParticles) |                
                      ranges::to<beluga::TupleVector>;
@@ -144,8 +147,8 @@ class Amcl3 {
     static constexpr double kUpdateMinD = 0.25;
     static constexpr double kUpdateMinA = 0.2;
     static constexpr size_t kResampleInterval = 10;
-    static constexpr int kMinParticles = 500;
-    static constexpr int kMaxParticles = 2000;
+    static constexpr int kMinParticles = 10;
+    static constexpr int kMaxParticles = 20;
     static constexpr double kLdEpsilon = 0.05;
     static constexpr double kLdZ = 3.0;
     static constexpr double kRecoveryAlphaSlow = 0.001;
@@ -198,40 +201,14 @@ class Amcl3Node : public rclcpp::Node {
             },
         };
 
-        Eigen::Matrix<double, 6, 6> covariance;
+        Eigen::Matrix<double, 6, 6> covariance = Eigen::Matrix<double, 6, 6>::Zero();
         covariance.coeffRef(0, 0) = kInitialPoseCovarianceX;
         covariance.coeffRef(1, 1) = kInitialPoseCovarianceY;
         covariance.coeffRef(2, 2) = kInitialPoseCovarianceZ;
         covariance.coeffRef(3, 3) = kInitialPoseCovarianceYaw;
         covariance.coeffRef(4, 4) = kInitialPoseCovariancePitch;
         covariance.coeffRef(5, 5) = kInitialPoseCovarianceRoll;
-        covariance.coeffRef(0, 1) = kInitialPoseCovarianceXY;
-        covariance.coeffRef(1, 0) = covariance.coeffRef(0, 1);
-        covariance.coeffRef(0, 2) = kInitialPoseCovarianceXZ;
-        covariance.coeffRef(2, 0) = covariance.coeffRef(0, 2);
-        covariance.coeffRef(0, 3) = kInitialPoseCovarianceXyaw;
-        covariance.coeffRef(3, 0) = covariance.coeffRef(0, 3);
-        covariance.coeffRef(0, 4) = kInitialPoseCovarianceXpitch;
-        covariance.coeffRef(4, 0) = covariance.coeffRef(0, 4);
-        covariance.coeffRef(0, 5) = kInitialPoseCovarianceXroll;
-        covariance.coeffRef(5, 0) = covariance.coeffRef(0, 5);
-        covariance.coeffRef(1, 2) = kInitialPoseCovarianceYZ;
-        covariance.coeffRef(2, 1) = covariance.coeffRef(1, 2);
-        covariance.coeffRef(1, 3) = kInitialPoseCovarianceYyaw;
-        covariance.coeffRef(3, 1) = covariance.coeffRef(1, 3);
-        covariance.coeffRef(1, 4) = kInitialPoseCovarianceYroll;
-        covariance.coeffRef(4, 1) = covariance.coeffRef(1, 4);
-        covariance.coeffRef(1, 5) = kInitialPoseCovarianceYpitch;
-        covariance.coeffRef(5, 1) = covariance.coeffRef(1, 5);
-        covariance.coeffRef(2, 3) = kInitialPoseCovarianceZyaw;
-        covariance.coeffRef(3, 2) = covariance.coeffRef(2, 3);
-        covariance.coeffRef(2, 4) = kInitialPoseCovarianceZroll;
-        covariance.coeffRef(4, 2) = covariance.coeffRef(2, 4);
-        covariance.coeffRef(2, 5) = kInitialPoseCovarianceZpitch;
-        covariance.coeffRef(5, 2) = covariance.coeffRef(2, 5);
         
-        last_known_estimate_ = std::make_pair(pose, covariance);
-
         // Create filter
         particle_filter_ = std::make_unique<Amcl3>(
             motion_model{params_mm},
@@ -267,6 +244,11 @@ class Amcl3Node : public rclcpp::Node {
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Subscribed to pointcloud_topic: %s", pointcloud_sub_->getTopic().c_str());
 
         pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_amcl3", rclcpp::SystemDefaultsQoS());
+
+        if (kDisplayMap) {
+            m_visualization_marker_pub_ = create_publisher<visualization_msgs::msg::Marker>("vdb_map_visualization", rclcpp::SystemDefaultsQoS());
+            display_map(grid);
+        } 
     }
 
  private:
@@ -353,6 +335,62 @@ class Amcl3Node : public rclcpp::Node {
             //tf2::covarianceEigenToRowMajor(base_pose_covariance, message.pose.covariance);
             pose_pub_->publish(message);
         }
+    }  
+
+    // Map displayer
+    // Adapted from:
+    // https://github.com/fzi-forschungszentrum-informatik/vdb_mapping_ros
+    void display_map(const openvdb::FloatGrid::Ptr grid) const {
+        visualization_msgs::msg::Marker marker_msg;
+        std_msgs::msg::ColorRGBA point_color;
+        openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+        double min_z, max_z;
+
+        openvdb::Vec3d min_world_coord = grid->indexToWorld(bbox.getStart());
+        openvdb::Vec3d max_world_coord = grid->indexToWorld(bbox.getEnd());
+
+        min_z = min_world_coord.z();
+        max_z = max_world_coord.z();
+
+        point_color.r = 1.0;
+        point_color.g = 1.0;
+        point_color.b = 1.0;
+        point_color.a = 1.0;
+
+        for (openvdb::FloatGrid::ValueOnCIter iter = grid->cbeginValueOn(); iter; ++iter) {
+            openvdb::Vec3d world_coord = grid->indexToWorld(iter.getCoord());
+            if (world_coord.z() < min_z || world_coord.z() > max_z) {
+                continue;
+            }
+            
+            geometry_msgs::msg::Point cube_center;
+            cube_center.x = world_coord.x();
+            cube_center.y = world_coord.y();
+            cube_center.z = world_coord.z();
+            marker_msg.points.push_back(cube_center);
+            marker_msg.colors.push_back(point_color);
+        }
+
+        double size                   = grid->transform().voxelSize()[0];
+        marker_msg.header.frame_id    = kGlobalFrameId;
+        marker_msg.header.stamp       = this->get_clock()->now();
+        marker_msg.id                 = 0;
+        marker_msg.type               = visualization_msgs::msg::Marker::CUBE_LIST;
+        marker_msg.scale.x            = size;
+        marker_msg.scale.y            = size;
+        marker_msg.scale.z            = size;
+        marker_msg.color.a            = 1.0;
+        marker_msg.pose.orientation.w = 1.0;
+        marker_msg.frame_locked       = true;
+
+        if (marker_msg.points.size() > 0) {
+            marker_msg.action = visualization_msgs::msg::Marker::ADD;
+        }
+        else {
+            marker_msg.action = visualization_msgs::msg::Marker::DELETE;
+        }
+
+        m_visualization_marker_pub_->publish(marker_msg);
     }
 
     // Callback group
@@ -361,6 +399,8 @@ class Amcl3Node : public rclcpp::Node {
     std::unique_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> pointcloud_sub_;
     // Transform synchronization filter for pointcloud updates.
     std::unique_ptr<tf2_ros::MessageFilter<sensor_msgs::msg::PointCloud2>> pointcloud_filter_;
+    // Map publisher
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_visualization_marker_pub_;
     // Connection for pointcloud updates filter and callback.
     message_filters::Connection pointcloud_connection_;
     // Particle filter instance.
@@ -375,12 +415,13 @@ class Amcl3Node : public rclcpp::Node {
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
     // Last known map to odom correction estimate, if any.
-    std::optional<Sophus::SE3d> last_known_odom_transform_in_map_;
+    std::optional<Sophus::SE3d> last_known_odom_transform_in_map_;        
 
     // Parameters
     // Constructor
     static constexpr bool kUseDedicatedThread = true;
-    const std::string kPointcloudTopic = "/velodyne_points";
+    static constexpr bool kDisplayMap = true;
+    const std::string kPointcloudTopic = "/output";
     const std::string kOdomFrameId = "odom";
     const std::string kMapFile = "/home/developer/ws/src/beluga_demo/localization/beluga_demo_amcl3_localization/maps/map.vdb";
 
@@ -395,21 +436,9 @@ class Amcl3Node : public rclcpp::Node {
     static constexpr double kInitialPoseCovarianceX = 0.25;
     static constexpr double kInitialPoseCovarianceY = 0.25;
     static constexpr double kInitialPoseCovarianceZ = 0.25;
-    static constexpr double kInitialPoseCovarianceYaw = 0.0685;
-    static constexpr double kInitialPoseCovariancePitch = 0.0685;
-    static constexpr double kInitialPoseCovarianceRoll = 0.0685;
-    static constexpr double kInitialPoseCovarianceXY = 0.0;
-    static constexpr double kInitialPoseCovarianceXZ = 0.0;
-    static constexpr double kInitialPoseCovarianceXyaw = 0.0;
-    static constexpr double kInitialPoseCovarianceXpitch = 0.0;
-    static constexpr double kInitialPoseCovarianceXroll = 0.0;
-    static constexpr double kInitialPoseCovarianceYZ = 0.0;
-    static constexpr double kInitialPoseCovarianceYyaw = 0.0;
-    static constexpr double kInitialPoseCovarianceYroll = 0.0;
-    static constexpr double kInitialPoseCovarianceYpitch = 0.0;
-    static constexpr double kInitialPoseCovarianceZyaw = 0.0;
-    static constexpr double kInitialPoseCovarianceZroll = 0.0;
-    static constexpr double kInitialPoseCovarianceZpitch = 0.0;
+    static constexpr double kInitialPoseCovarianceYaw = 0.15;
+    static constexpr double kInitialPoseCovariancePitch = 0.15;
+    static constexpr double kInitialPoseCovarianceRoll = 0.15;
 
     // Get Motion Model
     static constexpr double kAlpha1 = 0.1;

@@ -12,32 +12,99 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import os
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
-from launch_ros.actions import SetParameter
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler
+from launch.event_handlers import OnProcessStart
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
+from launch_ros.actions import Node
+
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    return LaunchDescription(
-        [
-            SetParameter(
-                name="use_sim_time",
-                value=True,
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution(
-                        [
-                            FindPackageShare("beluga_demo_amcl3_localization"),
-                            "launch",
-                            "bringup.launch.py",
-                        ]
-                    ),
-                ),
-            ),
-        ]
+    ################################################################################
+    # CONFIGURATION FILES
+    ################################################################################
+    # Packages names
+    amcl3_package_name = "beluga_demo_amcl3_localization"
+
+    # Rviz config file
+    rviz_config_file = PathJoinSubstitution([
+        FindPackageShare(amcl3_package_name),
+        "rviz",
+        "rviz.rviz"
+    ])
+
+
+    ################################################################################
+    # NODES DEFINITION
+    ################################################################################
+    beluga_amcl3 = Node(
+        package="beluga_demo_amcl3_localization",
+        executable="beluga_amcl3_demo_node",
+        name="beluga_amcl3_demo",
+        parameters = [{'use_sim_time': True}],
+        output="screen",
     )
+
+    static_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='velodyne_in_xsense',
+        arguments = ['0.0584867781527745', '0.00840419966766332', '0.168915521980526', '0.0078031', '0.0015042', '-0.0252884', 'base_link', 'velodyne'],
+        parameters = [{'use_sim_time': True}],
+    )
+
+    tf = Node(
+        package='beluga_demo_amcl3_localization',
+        executable='tf_publisher.py',
+        name='odom_to_base_link',
+        parameters = [{'use_sim_time': True}],
+    )
+
+    markers = Node(
+        package='beluga_demo_amcl3_localization',
+        executable='marker_publisher.py',
+        name='pose_marker_node',
+        parameters = [{'use_sim_time': True}],
+    )
+
+    voxel_filter = Node(
+        package="pcl_ros",
+        executable="filter_voxel_grid_node",
+        name="filter_voxel_grid_node",
+        parameters = [{'use_sim_time': True, 
+                        'leaf_size': 0.1}],
+        remappings=[
+            ('/input', '/velodyne_points'),
+            ],
+            output="screen",
+    )
+
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        parameters=[{'use_sim_time': True}],
+        arguments=["-d", rviz_config_file],
+    )
+
+
+    ################################################################################
+    # LAUNCH NODES
+    ################################################################################
+    nodes = [
+        rviz,
+        static_tf,
+        tf,
+        markers,
+        voxel_filter,
+        RegisterEventHandler(event_handler=OnProcessStart(target_action=rviz,
+                                                          on_start=[beluga_amcl3])
+        )
+    ]
+
+    return LaunchDescription(nodes)
+    
