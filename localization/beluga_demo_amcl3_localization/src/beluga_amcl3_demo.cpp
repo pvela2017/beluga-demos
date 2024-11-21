@@ -147,8 +147,8 @@ class Amcl3 {
     static constexpr double kUpdateMinD = 0.25;
     static constexpr double kUpdateMinA = 0.2;
     static constexpr size_t kResampleInterval = 10;
-    static constexpr int kMinParticles = 10;
-    static constexpr int kMaxParticles = 20;
+    static constexpr int kMinParticles = 500;
+    static constexpr int kMaxParticles = 1200;
     static constexpr double kLdEpsilon = 0.05;
     static constexpr double kLdZ = 3.0;
     static constexpr double kRecoveryAlphaSlow = 0.001;
@@ -420,8 +420,8 @@ class Amcl3Node : public rclcpp::Node {
     // Parameters
     // Constructor
     static constexpr bool kUseDedicatedThread = true;
-    static constexpr bool kDisplayMap = true;
-    const std::string kPointcloudTopic = "/output";
+    static constexpr bool kDisplayMap = false;
+    const std::string kPointcloudTopic = "/pointcloud";
     const std::string kOdomFrameId = "odom";
     const std::string kMapFile = "/home/developer/ws/src/beluga_demo/localization/beluga_demo_amcl3_localization/maps/map.vdb";
 

@@ -2,56 +2,42 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
-class PoseRepublisher(Node):
+class TfPublisher(Node):
 
     def __init__(self):
         super().__init__('tf_republisher_node')
 
-        # Subscribe to the input PoseStamped topic
+        # Subscribe to the input Odometry topic
         self.subscription = self.create_subscription(
-            PoseStamped,
-            'gt_poses',
-            self.pose_callback,
+            Odometry,
+            'odom',
+            self.odom_callback,
             10)
-
-        # Publisher for the republished PoseStamped with a different frame_id
-        self.publisher_ = self.create_publisher(PoseStamped, 'odom', 10)
 
         # Create a TransformBroadcaster to publish tf
         self.tf_broadcaster = TransformBroadcaster(self)
 
-    def pose_callback(self, msg):
-        new_frame_id = 'odom'
-
-        # Create a new PoseStamped message
-        new_msg = PoseStamped()
-        new_msg.header.stamp = self.get_clock().now().to_msg()
-        new_msg.header.frame_id = new_frame_id
-        new_msg.pose = msg.pose
-
-        # Publish the modified PoseStamped
-        self.publisher_.publish(new_msg)
-
+    def odom_callback(self, msg):
         # Create and publish the TransformStamped based on the PoseStamped
         transform = TransformStamped()
         transform.header.stamp = msg.header.stamp
-        transform.header.frame_id = new_msg.header.frame_id
-        transform.child_frame_id = 'base_link'
-        transform.transform.translation.x = new_msg.pose.position.x + 0.02725
-        transform.transform.translation.y = new_msg.pose.position.y - 0.0047
-        transform.transform.translation.z = new_msg.pose.position.z + 0.99466
-        transform.transform.rotation = new_msg.pose.orientation
+        transform.header.frame_id = msg.header.frame_id
+        transform.child_frame_id = msg.child_frame_id
+        transform.transform.translation.x = msg.pose.pose.position.x
+        transform.transform.translation.y = msg.pose.pose.position.y
+        transform.transform.translation.z = msg.pose.pose.position.z
+        transform.transform.rotation = msg.pose.pose.orientation
 
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = PoseRepublisher()
+    node = TfPublisher()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
