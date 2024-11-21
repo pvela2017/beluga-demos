@@ -78,6 +78,26 @@ def generate_launch_description():
                         'leaf_size': 0.1}],
         remappings=[
             ('/input', '/velodyne_points'),
+            ('/output', '/pointcloud'),
+            #('/output', '/output_voxel_filter'),
+        ],
+            output="screen",
+    )
+
+    crop_box_filter = Node(
+        package="pcl_ros",
+        executable="filter_crop_box_node",
+        name="filter_crop_box_node",
+        parameters = [{'use_sim_time': True, 
+                        'min_x': -20.0,
+                        'max_x': 20.0,
+                        'min_y': -20.0,
+                        'max_y': 20.0,
+                        'min_z': -20.0,
+                        'max_z': 20.0}],
+        remappings=[
+            ('/input', '/output_voxel_filter'),
+            ('/output', '/pointcloud'),
         ],
             output="screen",
     )
@@ -101,6 +121,7 @@ def generate_launch_description():
         tf,
         markers,
         voxel_filter,
+        #crop_box_filter,
         RegisterEventHandler(event_handler=OnProcessStart(target_action=rviz,
                                                           on_start=[beluga_amcl3])
         )
