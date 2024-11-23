@@ -2,7 +2,7 @@ FROM ros:jazzy-ros-base AS cacher
 
 WORKDIR /ws/src
 
-COPY . beluga_demo/
+COPY localization/beluga_demo_amcl3_localization beluga_demo/localization/
 
 RUN mkdir -p /tmp/ws/src \
   && find ./ -name "package.xml" | xargs cp --parents -t /tmp/ws/src \
@@ -19,19 +19,17 @@ RUN apt-get update \
     curl \
     gdb \
     git \
-    libboost-all-dev \
     libopenvdb-dev \
     python3-pip \
     mc \
+    ros-jazzy-pcl-ros \
     tmux \ 
   && rm -rf /var/lib/apt/lists/*
 
 ENV PIP_BREAK_SYSTEM_PACKAGES 1
 
-RUN pip uninstall -y setuptools
-
 RUN pip install  \
-  pre-commit==2.20.0 setuptools==66.1.1
+  pre-commit==2.20.0
 
 ARG USER=developer
 ARG GROUP=ekumen

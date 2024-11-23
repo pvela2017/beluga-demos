@@ -3,7 +3,9 @@ services:
     build:
       context: ..
       dockerfile: docker/images/${ROSDISTRO:-humble}/Dockerfile
-    container_name: beluga-demo-dev
+    image: ekumenlabs/beluga-demo-${ROSDISTRO:-humble}-dev
+    hostname: beluga-demo-${ROSDISTRO:-humble}-dev
+    container_name: beluga-demo-${ROSDISTRO:-humble}-dev
     environment:
       - DISPLAY
       - QT_X11_NO_MITSHM=1
@@ -15,7 +17,6 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth
-      - ..:/home/developer/ws/src/beluga_demo
       - beluga_demos_ccache:/home/developer/.ccache
       - /dev:/dev
 volumes:

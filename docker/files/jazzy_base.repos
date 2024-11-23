@@ -2,4 +2,4 @@ repositories:
   beluga:
     type: git
     url: https://github.com/pvela2017/beluga.git
-    version: d547b8a212b92c5926b9807d85820b35ab3822b6
+    version: likelihood_field_3d_model
